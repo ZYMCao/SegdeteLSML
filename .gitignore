@@ -42,7 +42,6 @@ static-persister
 Thumbs.db
 
 # Vibe Coding
-AGENTS.md
 .agent/
 .cline/
 .gemini/
