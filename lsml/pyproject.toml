@@ -1,0 +1,41 @@
+[project]
+name = "lsml"
+version = "2.0.0"
+description = "SegDete Label Studio ML backend and S3 offline tools (depends on segdete CV runtime)"
+requires-python = ">=3.12.0,<3.14.0"
+dependencies = [
+    "segdete",
+    "label-studio-ml>=1.0.9",
+    "minio>=7.1.0",
+]
+
+[project.scripts]
+lsml = "lsml._wsgi:main"
+stitch_to_s3 = "lsml.scripts.stitch_to_s3:main"
+autoindex_to_s3 = "lsml.scripts.autoindex_to_s3:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+force-include = { "src/lsml" = "lsml" }
+
+[[tool.uv.index]]
+url = "https://mirrors.ustc.edu.cn/pypi/simple/"
+default = true
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0.0",
+    "ruff>=0.15.10",
+]
+
+[tool.uv.sources]
+segdete = { path = "../backend", editable = true }
+
+[tool.uv]
+cache-keys = [{ file = "pyproject.toml" }, { file = "src/**/*.py" }]

@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>EnvironmentVariables</key>
+	<dict>
+		<key>COLLECT_ANALYTICS</key>
+		<string>0</string>
+		<key>CSRF_COOKIE_SECURE</key>
+		<string>0</string>
+		<key>CSRF_TRUSTED_ORIGINS</key>
+		<string>https://labelstudio.favstii.com,http://favstimacmini.local:8085</string>
+		<key>DJANGO_DB</key>
+		<string>postgresql</string>
+		<key>DJANGO_SETTINGS_MODULE</key>
+		<string>label_studio.core.settings.label_studio</string>
+		<key>HOST</key>
+		<string>http://favstimacmini.local:8085</string>
+		<key>LABEL_STUDIO_DISABLE_TELEMETRY</key>
+		<string>1</string>
+		<key>LABEL_STUDIO_PORT</key>
+		<string>8085</string>
+		<key>LOG_LEVEL</key>
+		<string>INFO</string>
+		<key>ML_CONNECTION_TIMEOUT</key>
+		<string>10</string>
+		<key>ML_TIMEOUT_HEALTH</key>
+		<string>15</string>
+		<key>ML_TIMEOUT_PREDICT</key>
+		<string>180</string>
+		<key>ML_TIMEOUT_SETUP</key>
+		<string>15</string>
+		<key>NO_PROXY</key>
+		<string>localhost,127.0.0.1,*.local,192.168.0.0/16,172.16.0.0/12,10.0.0.0/8,192.168.61.222,&lt;local&gt;</string>
+		<key>PATH</key>
+		<string>/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+		<key>POSTGRE_HOST</key>
+		<string>localhost</string>
+		<key>POSTGRE_NAME</key>
+		<string>labelstudio</string>
+		<key>POSTGRE_PASSWORD</key>
+		<string>3.1415926Pi</string>
+		<key>POSTGRE_PORT</key>
+		<string>5432</string>
+		<key>POSTGRE_USER</key>
+		<string>administrator</string>
+		<key>PYTHONPATH</key>
+		<string>/Users/administrator/PyCharmProjects/LabelStudio:/Users/administrator/PyCharmProjects/LabelStudio/.venv-14/lib/python3.14/site-packages</string>
+		<key>RQ_REDIS_URL</key>
+		<string>redis://:3.1415926Pi@localhost:6379/0</string>
+		<key>S3_TRUSTED_STORAGE_DOMAINS</key>
+		<string>favstimacmini.local</string>
+		<key>SESSION_COOKIE_SECURE</key>
+		<string>0</string>
+	</dict>
+	<key>KeepAlive</key>
+	<true/>
+	<key>Label</key>
+	<string>uv.labelstudio</string>
+	<key>ProcessType</key>
+	<string>Background</string>
+	<key>ProgramArguments</key>
+	<array>
+		<string>/bin/sh</string>
+		<string>-c</string>
+		<string>cd /Users/administrator/PyCharmProjects/LabelStudio &amp;&amp; exec /usr/local/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/Resources/Python.app/Contents/MacOS/Python label_studio/manage.py runserver 0.0.0.0:8085 --noreload 2&gt;&amp;1</string>
+	</array>
+	<key>RunAtLoad</key>
+	<true/>
+	<key>StandardOutPath</key>
+	<string>/Users/administrator/Library/Logs/LabelStudio/labelstudio.log</string>
+	<key>ThrottleInterval</key>
+	<integer>5</integer>
+	<key>WorkingDirectory</key>
+	<string>/Users/administrator/PyCharmProjects/LabelStudio</string>
+</dict>
+</plist>

@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>uv.lsml</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/bash</string>
+    <string>-c</string>
+    <string>exec /opt/homebrew/Cellar/python@3.13/3.13.15/Frameworks/Python.framework/Versions/3.13/Resources/Python.app/Contents/MacOS/Python -m lsml._wsgi --host :: --port 9090</string>
+  </array>
+  <key>WorkingDirectory</key>
+  <string>/Users/zhanyingcao/PyCharmProjects/SegDete/backend</string>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PYTHONPATH</key>
+    <string>/Users/zhanyingcao/PyCharmProjects/SegDete/backend/.venv/lib/python3.13/site-packages</string>
+    <key>PATH</key>
+    <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+    <key>LABEL_STUDIO_URL</key>
+    <string>http://favstimacmini.local:8085</string>
+    <key>LABEL_STUDIO_API_KEY</key>
+    <string>fdfc77768fc7167f6eba5518192223ffbf508b71</string>
+    <key>SEGDETE_YOLO_CLASSIFIER_THRESHOLD</key>
+    <string>0.30</string>
+  </dict>
+  <key>StandardOutPath</key>
+  <string>/Users/zhanyingcao/Library/Logs/lsml/ml-backend.log</string>
+  <key>StandardErrorPath</key>
+  <string>/Users/zhanyingcao/Library/Logs/lsml/ml-backend.log</string>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <true/>
+</dict>
+</plist>

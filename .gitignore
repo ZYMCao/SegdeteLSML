@@ -1,0 +1,52 @@
+# compiled output
+dist/
+tmp/
+build/
+**/public/
+deb_dist/
+/results/
+*.gz
+*.deb
+*.rpm
+
+# Python
+/*.egg-info/
+__pycache__/
+venv
+.venv/
+.env
+.python-version
+/.lsml/
+
+# Log Files
+/log/
+*/log/
+*.log
+**/*.log
+/data/
+/web_test_data/
+yoloassets/
+*.png
+log
+static-persister
+
+# IDEs and editors
+.vscode/
+.idea/
+*.pid
+*/**/*.pid
+*.iml
+
+# System Files
+.DS_Store
+Thumbs.db
+
+# Vibe Coding
+AGENTS.md
+.agent/
+.cline/
+.gemini/
+.clinerules/
+.pencil/
+.factory/
+skills-lock.json
