@@ -1,11 +1,11 @@
-#### 1. `segdete`
+#### 1. `cli`
 连接真实相机和本地 MQTT：
 ```bash
-MQTT_TOKEN="0225081901.Segdete.1" SEGDETE_CAMERA_SNS="23779946,23854174" uv run --project backend segdete
+MQTT_TOKEN="0225081901.Segdete.1" SEGDETE_CAMERA_SNS="23779946,23854174" uv run --project backend cli
 ```
 降级为无相机模式启动 Web 界面：
 ```bash
-MQTT_HOST=localhost MQTT_TOKEN="0225081901.Segdete.1" uv run --project backend segdete
+MQTT_HOST=localhost MQTT_TOKEN="0225081901.Segdete.1" uv run --project backend cli
 ```
 
 #### 2. `test`（单图 Web 检测测试）
@@ -28,30 +28,42 @@ uv run --project backend test_release_detector
 
 #### 5. `replay_camera`（无相机端到端回放）
 
-当前 Basler 相机通过 USB/pypylon 接入，并不通过串口传图。回放脚本把
-`data/left` 中的每张现场单图切成带重叠区域的虚拟左右帧，然后复用生产的
-拼接、分类、检测、落盘和 MQTT 遥测链路。真实双目标定不适用于这种虚拟帧，
-脚本会在本次运行中关闭预对齐和双目矫正。
+当前 Basler 相机通过 USB/pypylon 接入，并不通过串口传图。回放模式由正在运行的
+`segdete` 服务消费图片并执行生产的拼接、分类、检测、落盘和 MQTT 遥测链路；
+`replay_camera` 只投递现场图片，不加载模型或执行业务逻辑。
 
-先在本地跑一张图验证，不连接 MQTT：
-
-```bash
-uv run --project backend replay_camera \
-  --dry-run \
-  --limit 1 \
-  --output-dir data/replay-out
-```
-
-连接本地 ThingsBoard Edge，依次回放整个目录：
+生产 unit 将 `SEGDETE_CAMERA_BACKEND` 配置为 `replay`。部署并启动服务：
 
 ```bash
-MQTT_HOST=localhost \
-MQTT_TOKEN="0225081901.Segdete.1" \
-uv run --project backend replay_camera \
-  --input-dir data/left \
-  --output-dir /srv/static-persister/segdete
+sudo cp deploy/segdete.service /etc/systemd/system/segdete.service
+sudo systemctl daemon-reload
+sudo systemctl restart segdete
 ```
 
-脚本按现有生产约定把图片写入静态文件目录，并通过 MQTT 上传结果和图片 URL；
-它不会把图片二进制直接塞进 MQTT 消息。`--interval` 最小为 1 秒，避免现有按秒
-生成的结果文件名互相覆盖。
+以服务用户投递一张图片：
+
+```bash
+sudo -u easttrans /opt/segdete/backend/.venv/bin/replay_camera \
+  --limit 1
+```
+
+图片来源默认为 `data/left`，可在执行 `replay_camera` 时用
+`SEGDETE_REPLAY_SOURCE` 或 `--input-dir` 覆盖。
+脚本结束表示投递完成；最终处理状态查看 `segdete` 日志和 MQTT 结果。
+
+开发环境分别启动消费者和生产者：
+
+```bash
+SEGDETE_CAMERA_BACKEND=replay \
+MQTT_TOKEN="<device-token>" \
+uv run --project backend cli --no-web
+```
+
+```bash
+uv run --project backend replay_camera
+```
+
+`data/left` 是单图而不是真实双目照片。服务将每张图片拆为带重叠区域的虚拟左右帧，
+并在 replay 模式关闭只适用于真实双目相机的预对齐和矫正。若要恢复物理相机，需将
+unit 中的 `SEGDETE_CAMERA_BACKEND` 改回 `basler` 后重启服务。回放的重叠比例固定为
+`0.35`，服务等待图片的轮询超时固定为 `1` 秒。
