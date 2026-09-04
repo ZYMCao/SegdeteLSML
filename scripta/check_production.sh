@@ -549,8 +549,18 @@ check_devices() {
     basler_count="$(printf '%s\n' "$usb" | grep -Eic 'ID 2676:' || true)"
     buzzer_count="$(printf '%s\n' "$usb" | grep -Eic 'ID 1a86:5523' || true)"
     geoposition_count="$(printf '%s\n' "$usb" | grep -Eic 'ID 1a86:7523' || true)"
+    camera_backend="$(env_value_of_file "$DEPLOY_DIR/segdete.service" SEGDETE_CAMERA_BACKEND)"
     configured_camera_sns="$(normalize_csv "$(env_value_of_file "$DEPLOY_DIR/segdete.service" SEGDETE_CAMERA_SNS)")"
     expected_camera_count="$(count_csv "$configured_camera_sns")"
+    check_optional_device_count "buzzer USB 1a86:5523" "$buzzer_count"
+    check_optional_device_count "geoposition USB 1a86:7523" "$geoposition_count"
+
+    if [ "$camera_backend" = "replay" ]; then
+        CAMERA_READY=1
+        ok "replay camera backend enabled"
+        return
+    fi
+
     if [ "$expected_camera_count" -eq 0 ]; then
         action "CAMERA_CONFIG: SEGDETE_CAMERA_SNS is empty in $DEPLOY_DIR/segdete.service"
     elif [ "$basler_count" -eq "$expected_camera_count" ]; then
@@ -558,8 +568,6 @@ check_devices() {
     else
         action "CAMERA_USB_COUNT: detected=$basler_count configured=$expected_camera_count"
     fi
-    check_optional_device_count "buzzer USB 1a86:5523" "$buzzer_count"
-    check_optional_device_count "geoposition USB 1a86:7523" "$geoposition_count"
 
     python="$BACKEND_DIR/.venv/bin/python"
     if [ ! -x "$python" ]; then
