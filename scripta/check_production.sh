@@ -4,30 +4,30 @@
 # Runs on the production box inside the /opt/segdete worktree, AFTER `git pull`.
 # Read-only: it never modifies the venv, services, unit files, devices, or nginx.
 # It verifies repository/venv/config convergence plus live service, HTTP, MQTT,
-# filesystem, disk, timer, device-inventory, and fatal-log health.
+# filesystem, disk, timer, device-inventory, and fatal-log health. MQTT
+# verification only observes the kernel socket table; it never connects.
 #
 # Design rules:
 #   - Environment= entries are compared by KEY only, never by value, and
 #     values are never printed (tokens stay secret).
-#   - Exit codes: 0 = all green, 1 = action needed (exact fix commands are
-#     printed), 2 = the script itself cannot run (fail loud).
+#   - Exit codes: 0 = no blocking failure (warnings may exist), 1 = action
+#     needed, 2 = the script itself cannot run (fail loud).
 #   - Portable bash (macOS bash 3.2 and Linux): no associative arrays, no
 #     mapfile, no process substitution in critical paths.
 #
 # Tunables (env overrides exist so the script is testable with fixtures):
 #   REPO_ROOT, SYSTEMD_DIR, NGINX_AVAILABLE, NGINX_ENABLED, UDEV_DIR,
 #   STRICT_LIVE=1 (set 0 to skip all host-runtime checks when testing),
-#   UV_BIN, CHECK_RELEASE=1, EXPECTED_BRANCH=quinque, EXPECTED_COMMIT,
+#   UV_BIN, CHECK_RELEASE=1, EXPECTED_BRANCH=quinque,
 #   TB_EDGE_URL, NGINX_URL, STATIC_URL, MQTT_PORT=1883,
-#   MIN_DISK_FREE_KB=1048576, MAX_UNIT_RESTARTS=0,
-#   HARDWARE_PROFILE=report (report|none|buzzer-geo|camera|all),
-#   EXPECTED_BASLER_COUNT, EXPECTED_BUZZER_COUNT,
-#   EXPECTED_GEOPOSITION_COUNT, EXPECTED_CAMERA_SNS.
+#   MIN_DISK_FREE_KB=1048576, MAX_UNIT_RESTARTS=0.
 
 set -uo pipefail
 
 EXIT=0
 ACTIONS=0
+WARNINGS=0
+CAMERA_READY=0
 
 # ---------------------------------------------------------------- locations
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -42,46 +42,12 @@ STRICT_LIVE="${STRICT_LIVE:-1}"
 UV_BIN="${UV_BIN:-}"
 CHECK_RELEASE="${CHECK_RELEASE:-1}"
 EXPECTED_BRANCH="${EXPECTED_BRANCH:-quinque}"
-EXPECTED_COMMIT="${EXPECTED_COMMIT:-}"
 TB_EDGE_URL="${TB_EDGE_URL:-http://127.0.0.1:8080/}"
 NGINX_URL="${NGINX_URL:-http://127.0.0.1/}"
 STATIC_URL="${STATIC_URL:-http://127.0.0.1/static-persister/segdete/}"
 MQTT_PORT="${MQTT_PORT:-1883}"
 MIN_DISK_FREE_KB="${MIN_DISK_FREE_KB:-1048576}"
 MAX_UNIT_RESTARTS="${MAX_UNIT_RESTARTS:-0}"
-HARDWARE_PROFILE="${HARDWARE_PROFILE:-report}"
-EXPECTED_BASLER_COUNT="${EXPECTED_BASLER_COUNT:-}"
-EXPECTED_BUZZER_COUNT="${EXPECTED_BUZZER_COUNT:-}"
-EXPECTED_GEOPOSITION_COUNT="${EXPECTED_GEOPOSITION_COUNT:-}"
-EXPECTED_CAMERA_SNS="${EXPECTED_CAMERA_SNS:-}"
-
-case "$HARDWARE_PROFILE" in
-    report) ;;
-    none)
-        [ -n "$EXPECTED_BASLER_COUNT" ] || EXPECTED_BASLER_COUNT=0
-        [ -n "$EXPECTED_BUZZER_COUNT" ] || EXPECTED_BUZZER_COUNT=0
-        [ -n "$EXPECTED_GEOPOSITION_COUNT" ] || EXPECTED_GEOPOSITION_COUNT=0
-        ;;
-    buzzer-geo)
-        [ -n "$EXPECTED_BASLER_COUNT" ] || EXPECTED_BASLER_COUNT=0
-        [ -n "$EXPECTED_BUZZER_COUNT" ] || EXPECTED_BUZZER_COUNT=1
-        [ -n "$EXPECTED_GEOPOSITION_COUNT" ] || EXPECTED_GEOPOSITION_COUNT=1
-        ;;
-    camera)
-        [ -n "$EXPECTED_BASLER_COUNT" ] || EXPECTED_BASLER_COUNT=2
-        [ -n "$EXPECTED_BUZZER_COUNT" ] || EXPECTED_BUZZER_COUNT=0
-        [ -n "$EXPECTED_GEOPOSITION_COUNT" ] || EXPECTED_GEOPOSITION_COUNT=0
-        ;;
-    all)
-        [ -n "$EXPECTED_BASLER_COUNT" ] || EXPECTED_BASLER_COUNT=2
-        [ -n "$EXPECTED_BUZZER_COUNT" ] || EXPECTED_BUZZER_COUNT=1
-        [ -n "$EXPECTED_GEOPOSITION_COUNT" ] || EXPECTED_GEOPOSITION_COUNT=1
-        ;;
-    *)
-        printf '[ERROR]  HARDWARE_PROFILE must be report, none, buzzer-geo, camera, or all\n' >&2
-        exit 2
-        ;;
-esac
 
 UNITS="segdete buzzer geoposition segdete-cleanup"
 TIMERS="segdete-cleanup"
@@ -91,6 +57,7 @@ STRUCT_KEYS="User Group WorkingDirectory ExecStart Restart RestartSec Type Stand
 # ---------------------------------------------------------------- reporting
 ok()     { printf '[OK]     %s\n' "$1"; }
 action() { printf '[ACTION] %s\n' "$1"; ACTIONS=$((ACTIONS + 1)); EXIT=1; }
+warn()   { printf '[WARN]   %s\n' "$1"; WARNINGS=$((WARNINGS + 1)); }
 skip()   { printf '[SKIP]   %s\n' "$1"; }
 die()    { printf '[ERROR]  %s\n' "$1" >&2; exit 2; }
 
@@ -156,20 +123,9 @@ check_release() {
 
     head_commit="$(git -C "$REPO_ROOT" rev-parse HEAD 2>/dev/null)" \
         || die "cannot resolve HEAD under $REPO_ROOT"
-    if [ -n "$EXPECTED_COMMIT" ]; then
-        expected="$(git -C "$REPO_ROOT" rev-parse "$EXPECTED_COMMIT^{commit}" 2>/dev/null)" \
-            || die "cannot resolve EXPECTED_COMMIT=$EXPECTED_COMMIT"
-        if [ "$head_commit" = "$expected" ]; then
-            ok "HEAD matches EXPECTED_COMMIT: $head_commit"
-        else
-            action "WRONG_COMMIT: HEAD=$head_commit want=$expected"
-        fi
-        return
-    fi
-
     upstream="$(git -C "$REPO_ROOT" rev-parse --abbrev-ref '@{upstream}' 2>/dev/null || true)"
     if [ -z "$upstream" ]; then
-        action "NO_UPSTREAM: set EXPECTED_COMMIT or configure a tracking branch"
+        action "NO_UPSTREAM: configure a tracking branch"
         return
     fi
     upstream_commit="$(git -C "$REPO_ROOT" rev-parse "$upstream" 2>/dev/null || true)"
@@ -178,7 +134,6 @@ check_release() {
     else
         action "REVISION_DRIFT: HEAD=$head_commit $upstream=$upstream_commit"
     fi
-    skip "EXPECTED_COMMIT not set; remote freshness was not checked"
 }
 
 # ---------------------------------------------------------------- part 1: venv
@@ -438,7 +393,7 @@ check_udev() {
     fi
 }
 
-# ---------------------------------------------------------------- part 5: endpoints and MQTT
+# ---------------------------------------------------------------- part 6: endpoints and MQTT
 check_http() {
     label="$1"
     url="$2"
@@ -454,7 +409,7 @@ check_http() {
 }
 
 check_endpoints() {
-    printf -- '--- 5. HTTP and MQTT ---\n'
+    printf -- '--- 6. HTTP and MQTT ---\n'
     if [ "$STRICT_LIVE" -eq 0 ]; then
         skip "HTTP and MQTT checks disabled (STRICT_LIVE=0)"
         return
@@ -483,14 +438,18 @@ check_endpoints() {
         | grep ESTAB \
         | grep -E ":$MQTT_PORT[[:space:]]" \
         | grep "pid=$pid," || true)"
-    if [ -n "$connection" ]; then
-        ok "segdete: established MQTT connection on port $MQTT_PORT"
+    if [ "$CAMERA_READY" -eq 1 ] && [ -n "$connection" ]; then
+        ok "segdete: cameras ready and MQTT connection is established (observed via ss)"
+    elif [ "$CAMERA_READY" -eq 1 ]; then
+        action "SEGDETE_MQTT_DISCONNECTED: cameras are ready but MainPID=<$pid> has no established connection on port $MQTT_PORT"
+    elif [ -n "$connection" ]; then
+        action "CAMERA_MQTT_INVARIANT: cameras are unavailable but MainPID=<$pid> is connected on port $MQTT_PORT"
     else
-        action "SEGDETE_MQTT_DISCONNECTED: MainPID=<$pid> has no established connection on port $MQTT_PORT"
+        ok "segdete: cameras unavailable and MQTT remains disconnected (observed via ss)"
     fi
 }
 
-# ---------------------------------------------------------------- part 6: storage and disk
+# ---------------------------------------------------------------- part 7: storage and disk
 check_access_as_user() {
     user="$1"
     path="$2"
@@ -530,7 +489,7 @@ check_disk() {
 }
 
 check_storage() {
-    printf -- '--- 6. storage and logs ---\n'
+    printf -- '--- 7. storage and logs ---\n'
     if [ "$STRICT_LIVE" -eq 0 ]; then
         skip "storage runtime checks disabled (STRICT_LIVE=0)"
         return
@@ -551,25 +510,7 @@ check_storage() {
     [ "$log_root" = "$save_root" ] || check_disk "$log_root"
 }
 
-# ---------------------------------------------------------------- part 7: connected-device inventory
-check_expected_count() {
-    label="$1"
-    actual="$2"
-    expected="$3"
-    if [ -z "$expected" ]; then
-        skip "$label: detected $actual; set HARDWARE_PROFILE or an expected count to assert it"
-        return
-    fi
-    case "$expected" in
-        *[!0-9]*) die "invalid expected count for $label: <$expected>" ;;
-    esac
-    if [ "$actual" -eq "$expected" ]; then
-        ok "$label: detected $actual"
-    else
-        action "DEVICE_COUNT: $label detected=$actual expected=$expected"
-    fi
-}
-
+# ---------------------------------------------------------------- part 5: connected-device inventory
 normalize_csv() {
     printf '%s\n' "$1" \
         | tr ',' '\n' \
@@ -578,8 +519,27 @@ normalize_csv() {
         | paste -sd, -
 }
 
+count_csv() {
+    normalized="$(normalize_csv "$1")"
+    if [ -z "$normalized" ]; then
+        printf '0\n'
+    else
+        printf '%s\n' "$normalized" | awk -F, '{ print NF }'
+    fi
+}
+
+check_optional_device_count() {
+    label="$1"
+    actual="$2"
+    if [ "$actual" -eq 1 ]; then
+        ok "$label: detected 1"
+    else
+        warn "$label: detected=$actual expected=1"
+    fi
+}
+
 check_devices() {
-    printf -- '--- 7. device inventory ---\n'
+    printf -- '--- 5. device inventory ---\n'
     if [ "$STRICT_LIVE" -eq 0 ]; then
         skip "device inventory disabled (STRICT_LIVE=0)"
         return
@@ -589,9 +549,17 @@ check_devices() {
     basler_count="$(printf '%s\n' "$usb" | grep -Eic 'ID 2676:' || true)"
     buzzer_count="$(printf '%s\n' "$usb" | grep -Eic 'ID 1a86:5523' || true)"
     geoposition_count="$(printf '%s\n' "$usb" | grep -Eic 'ID 1a86:7523' || true)"
-    check_expected_count "Basler USB" "$basler_count" "$EXPECTED_BASLER_COUNT"
-    check_expected_count "buzzer USB 1a86:5523" "$buzzer_count" "$EXPECTED_BUZZER_COUNT"
-    check_expected_count "geoposition USB 1a86:7523" "$geoposition_count" "$EXPECTED_GEOPOSITION_COUNT"
+    configured_camera_sns="$(normalize_csv "$(env_value_of_file "$DEPLOY_DIR/segdete.service" SEGDETE_CAMERA_SNS)")"
+    expected_camera_count="$(count_csv "$configured_camera_sns")"
+    if [ "$expected_camera_count" -eq 0 ]; then
+        action "CAMERA_CONFIG: SEGDETE_CAMERA_SNS is empty in $DEPLOY_DIR/segdete.service"
+    elif [ "$basler_count" -eq "$expected_camera_count" ]; then
+        ok "Basler USB: detected $basler_count configured cameras"
+    else
+        action "CAMERA_USB_COUNT: detected=$basler_count configured=$expected_camera_count"
+    fi
+    check_optional_device_count "buzzer USB 1a86:5523" "$buzzer_count"
+    check_optional_device_count "geoposition USB 1a86:7523" "$geoposition_count"
 
     python="$BACKEND_DIR/.venv/bin/python"
     if [ ! -x "$python" ]; then
@@ -599,13 +567,6 @@ check_devices() {
         return
     fi
     service_user="$(struct_of_file "$DEPLOY_DIR/segdete.service" User)"
-    if [ -z "$EXPECTED_CAMERA_SNS" ]; then
-        case "$HARDWARE_PROFILE" in
-            camera|all)
-                EXPECTED_CAMERA_SNS="$(env_value_of_file "$DEPLOY_DIR/segdete.service" SEGDETE_CAMERA_SNS)"
-                ;;
-        esac
-    fi
     camera_sns="$(runuser -u "$service_user" -- "$python" -c \
         'from pypylon import pylon; print(",".join(sorted(d.GetSerialNumber() for d in pylon.TlFactory.GetInstance().EnumerateDevices())))' \
         2>/dev/null)"
@@ -614,19 +575,15 @@ check_devices() {
         action "PYLON_ENUMERATION_FAILED: running as $service_user"
         return
     fi
-    if [ -n "$camera_sns" ]; then
-        ok "pylon camera serials: $camera_sns"
-    else
-        ok "pylon camera serials: none"
+    actual_camera_sns="$(normalize_csv "$camera_sns")"
+    if [ -n "$actual_camera_sns" ]; then
+        ok "pylon camera serials: $actual_camera_sns"
     fi
-    if [ -n "$EXPECTED_CAMERA_SNS" ]; then
-        actual_normalized="$(normalize_csv "$camera_sns")"
-        expected_normalized="$(normalize_csv "$EXPECTED_CAMERA_SNS")"
-        if [ "$actual_normalized" = "$expected_normalized" ]; then
-            ok "pylon serials match EXPECTED_CAMERA_SNS"
-        else
-            action "CAMERA_SERIALS: detected=<$actual_normalized> expected=<$expected_normalized>"
-        fi
+    if [ -n "$configured_camera_sns" ] && [ "$actual_camera_sns" = "$configured_camera_sns" ]; then
+        CAMERA_READY=1
+        ok "pylon serials match SEGDETE_CAMERA_SNS"
+    else
+        action "CAMERA_SERIALS: detected=<$actual_camera_sns> configured=<$configured_camera_sns>"
     fi
 }
 
@@ -702,10 +659,19 @@ for timer in $TIMERS; do
 done
 check_nginx
 check_udev
+check_devices
 check_endpoints
 check_storage
-check_devices
 check_logs
 
-printf -- '--- summary: %s ---\n' "$([ "$EXIT" -eq 0 ] && printf 'ALL GREEN' || printf '%s action(s) needed' "$ACTIONS")"
+if [ "$EXIT" -eq 0 ] && [ "$WARNINGS" -eq 0 ]; then
+    summary="ALL GREEN"
+elif [ "$EXIT" -eq 0 ]; then
+    summary="PASSED WITH $WARNINGS warning(s)"
+elif [ "$WARNINGS" -eq 0 ]; then
+    summary="$ACTIONS action(s) needed"
+else
+    summary="$ACTIONS action(s) needed, $WARNINGS warning(s)"
+fi
+printf -- '--- summary: %s ---\n' "$summary"
 exit "$EXIT"
