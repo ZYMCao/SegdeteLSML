@@ -3,9 +3,11 @@ from unittest.mock import Mock
 
 import pytest
 from paho.mqtt.client import MQTTMessage
+from tb_device_mqtt import ATTRIBUTES_TOPIC, TBDeviceMqttClient
+
+import segdete.mqtt.tb_client as tb_module
 from segdete.config.messaging import MessagingConfig
 from segdete.mqtt.tb_client import TBEdgeClient
-from tb_device_mqtt import ATTRIBUTES_TOPIC, TBDeviceMqttClient
 
 
 @pytest.fixture
@@ -13,6 +15,7 @@ def mqtt_commands(processing_env, monkeypatch):
     env = processing_env
     monkeypatch.setenv("MQTT_TOKEN", "test-device")
     monkeypatch.setattr(TBDeviceMqttClient, "connect", Mock())
+    monkeypatch.setattr(TBDeviceMqttClient, "is_connected", Mock(return_value=True))
     publish = Mock()
     monkeypatch.setattr(TBDeviceMqttClient, "_publish_data", publish)
     client = TBEdgeClient(MessagingConfig(), env.commands)
@@ -94,3 +97,46 @@ def test_disconnect_closes_connection_before_async_callback(monkeypatch):
 
     assert client.disconnect() is True
     raw_client.disconnect.assert_called_once_with()
+
+
+def test_connect_retries_initial_network_failure(monkeypatch):
+    monkeypatch.setenv("MQTT_TOKEN", "test-device")
+    raw_client = Mock()
+    raw_client.connect.side_effect = [ConnectionRefusedError("refused"), None]
+    raw_client.is_connected.return_value = True
+    monkeypatch.setattr(TBEdgeClient, "_create_tb_client", lambda _: raw_client)
+    monkeypatch.setattr(tb_module, "_MQTT_CONNECT_RETRY_SEC", 0)
+    client = TBEdgeClient(MessagingConfig(), Mock())
+
+    assert client.connect() is True
+    assert raw_client.connect.call_count == 2
+    raw_client.disconnect.assert_not_called()
+    raw_client.send_attributes.assert_called_once_with({"systemRunning": True})
+
+
+def test_connect_waits_for_successful_connack(monkeypatch):
+    monkeypatch.setenv("MQTT_TOKEN", "test-device")
+    raw_client = Mock()
+    raw_client.is_connected.side_effect = [False, False, True]
+    monkeypatch.setattr(TBEdgeClient, "_create_tb_client", lambda _: raw_client)
+    sleep = Mock()
+    monkeypatch.setattr(tb_module.time, "sleep", sleep)
+    client = TBEdgeClient(MessagingConfig(), Mock())
+
+    assert client.connect() is True
+    raw_client.connect.assert_called_once_with()
+    assert sleep.call_count == 2
+    raw_client.send_attributes.assert_called_once_with({"systemRunning": True})
+
+
+def test_publish_is_delegated_to_sdk_during_reconnect(monkeypatch):
+    monkeypatch.setenv("MQTT_TOKEN", "test-device")
+    raw_client = Mock()
+    raw_client.is_connected.return_value = False
+    monkeypatch.setattr(TBEdgeClient, "_create_tb_client", lambda _: raw_client)
+    client = TBEdgeClient(MessagingConfig(), Mock())
+
+    assert client.send_telemetry({"value": 1}) is True
+    assert client.send_attributes({"state": True}) is True
+    raw_client.send_telemetry.assert_called_once_with({"value": 1})
+    raw_client.send_attributes.assert_called_once_with({"state": True})

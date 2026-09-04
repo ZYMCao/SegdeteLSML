@@ -6,6 +6,7 @@ from unittest.mock import Mock
 import cv2
 import numpy as np
 import pytest
+from segdete.camera.replay import ReplayCameraManager
 from segdete.config.settings import load_settings
 from segdete.pipeline import processor
 from segdete.vision.classifier import MLClassifier
@@ -77,6 +78,27 @@ def test_successful_cycle_saves_images_csv_and_telemetry(cycle_inputs):
     assert payload["urlPre"] == cycle_inputs["settings"].storage.image_url(image_path)
 
 
+def test_replay_source_image_flows_to_business_telemetry(cycle_inputs, tmp_path):
+    source = tmp_path / "replay-source"
+    source.mkdir()
+    image_path = source / "field.png"
+    assert cv2.imwrite(str(image_path), np.full((24, 64, 3), 80, dtype=np.uint8))
+    cycle_inputs["camera_manager"] = ReplayCameraManager(source)
+
+    assert processor.process_one_cycle(**cycle_inputs) is True
+
+    cycle_inputs["tb_client"].send_telemetry.assert_called_once()
+    assert cycle_inputs["camera_manager"].current_source == "field.png"
+    assert image_path.is_file()
+
+
+def test_cycle_reports_failure_when_mqtt_rejects_telemetry(cycle_inputs):
+    cycle_inputs["tb_client"].send_telemetry.return_value = False
+
+    assert processor.process_one_cycle(**cycle_inputs) is False
+    cycle_inputs["tb_client"].send_telemetry.assert_called_once()
+
+
 @pytest.mark.parametrize("reason", ["missing_frames", "failed_stitch"])
 def test_incomplete_cycle_does_not_publish_a_result(cycle_inputs, reason):
     if reason == "missing_frames":
@@ -119,3 +141,39 @@ def test_cycle_with_configured_model_weights_on_cpu(cycle_inputs):
         assert Path(payload["yolo"]["vis_path"]).is_file()
     finally:
         init_yolo_config({})
+
+
+def test_cycle_saves_annotated_image_to_url_pre_when_detections_exist(
+    cycle_inputs, monkeypatch
+):
+    cycle_inputs["yolo_cfg"]["enabled"] = True
+    detection = {
+        "x": 2,
+        "y": 2,
+        "w": 10,
+        "h": 10,
+        "confidence": 0.95,
+        "class_name": "中度离析",
+    }
+    monkeypatch.setattr(
+        processor,
+        "yolo_detect_once",
+        Mock(return_value=([detection], None, {"ok": True, "backend": "mock"})),
+    )
+
+    assert processor.process_one_cycle(**cycle_inputs) is True
+
+    with Path(cycle_inputs["csv_path"]).open() as source:
+        rows = list(csv.reader(source))
+    image_name, _, _, image_path = rows[0]
+
+    payload = cycle_inputs["tb_client"].send_telemetry.call_args.args[0]
+    expected_url = cycle_inputs["settings"].storage.image_url(image_path)
+    assert payload["urlPre"] == expected_url
+    assert payload["urlBbox"] == expected_url
+    assert payload["imageId"] == Path(image_name).stem
+
+    saved_img = cv2.imread(image_path)
+    # The green rectangle drawn by draw_bboxes has color (0, 255, 0) in BGR
+    assert np.any(saved_img[:, :, 1] == 255)
+

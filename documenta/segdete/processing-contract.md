@@ -25,6 +25,9 @@
 
 ## MQTT 命令入口
 
+- 相机可用时，CLI 必须等到 MQTT 服务端返回成功 CONNACK 后，才上报 `systemRunning` 并启动图片处理线程。
+- 初次 TCP 连接失败时按固定间隔继续尝试；TCP 连接已经启动但尚未收到成功 CONNACK 时，由 ThingsBoard SDK 按退避策略持续重连，CLI 不设置退出超时。
+- 运行期间连接中断时，遥测和属性发送交给 ThingsBoard SDK 等待重连，不能因瞬时断线直接丢弃业务数据。
 - 一条属性更新消息中的每个属性只入队一次。SDK 的按键订阅回调会收到整份消息，因此使用一个整体属性订阅，避免批量更新被重复分发。
 - 成功确认使用对应的实际命令处理结果；无效输入、未知命令、设备失败不发送成功确认。
 - 自动验证：`test_mqtt_commands.py` 使用真实 Paho 消息对象、ThingsBoard SDK 解码/分发、业务适配器、队列和处理循环；只替换网络连接/发送与设备、模型。它不是 broker 端到端测试，也不承诺 MQTT 重投消息的业务去重。
@@ -57,12 +60,11 @@
 
 ## 相机回放
 
-- `replay_camera` 只负责投递图片，不得加载模型、发布 MQTT 或直接调用处理周期。
-- `cli` 在 `SEGDETE_CAMERA_BACKEND=replay` 时持有虚拟相机并连接 MQTT；暂时没有待处理图片不代表相机失联。
-- 生产者先写临时文件再原子改名；消费者成功读取后删除队列文件，坏图保留为 `.failed` 文件。
+- `cli` 在 `SEGDETE_CAMERA_BACKEND=replay` 时持有虚拟相机，直接按文件名顺序处理项目根目录 `data/left` 中的支持图片。
+- 每次服务启动回放目录中的全部图片，源文件保持不变；目录不存在或没有支持图片时启动失败并明确报告。
 - replay 输入无需硬件预热，并关闭面向真实双目安装参数的预对齐和矫正；单图拆分出的虚拟左右帧只用于触发业务流程，不验证真实双目成像质量。
 - `segdete` 服务仍是拼接、分类、检测、落盘和 MQTT 发布的唯一执行者。
-- 自动验证：`test_replay_camera.py` 覆盖原子投递、虚拟帧和坏图隔离；`test_cli_mqtt_lifecycle.py` 检查 replay 模式不会初始化 Basler 且由运行中的 CLI 持有处理生命周期。
+- 自动验证：`test_replay_camera.py` 覆盖目录读取顺序、虚拟帧、源文件保留和坏图跳过；`test_cli_mqtt_lifecycle.py` 检查 replay 模式不会初始化 Basler 且由运行中的 CLI 持有处理生命周期。
 
 ## 检测结果
 

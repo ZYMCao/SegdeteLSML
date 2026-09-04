@@ -38,6 +38,7 @@ class Client:
     def connect(self):
         if sys.argv[1] == "paused":
             self.commands.put(("setSystemRunning", False, lambda _: print("READY", flush=True)))
+        return True
     def disconnect(self):
         print("DISCONNECT", flush=True)
 
@@ -75,7 +76,7 @@ def test_cli_signal_stops_command_consumer(tmp_path, state, stop_signal, mode):
         stderr=subprocess.STDOUT,
         env={
             **os.environ,
-            "PYTHONPATH": str(Path(__file__).resolve().parents[1] / "src"),
+            "PYTHONPATH": str(Path(__file__).resolve().parents[1]),
         },
     ) as child:
         output = b""

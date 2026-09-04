@@ -52,7 +52,8 @@ def test_replay_backend_is_owned_by_running_cli(monkeypatch, tmp_path):
     settings.runtime.prewarm_frames = 20
     replay_camera = Mock(
         sn_list=["replay-left", "replay-right"],
-        inbox=tmp_path / "inbox",
+        source_dir=tmp_path / "source",
+        image_count=2,
         web_running=True,
     )
     replay_camera.is_available.return_value = True
@@ -85,7 +86,7 @@ def test_replay_backend_is_owned_by_running_cli(monkeypatch, tmp_path):
     cli.main()
 
     physical_camera.assert_not_called()
-    replay_factory.assert_called_once_with()
+    replay_factory.assert_called_once_with(settings.acquisition.replay_source)
     assert settings.runtime.prewarm_frames == 0
     assert settings.vision.prealign.enabled is False
     assert settings.vision.calib.enabled is False
