@@ -1,0 +1,419 @@
+{
+  "ruleChain": {
+    "name": "GeoPositionZG",
+    "type": "CORE",
+    "firstRuleNodeId": null,
+    "root": false,
+    "debugMode": false,
+    "configuration": null,
+    "additionalInfo": {
+      "description": ""
+    }
+  },
+  "metadata": {
+    "version": null,
+    "firstNodeIndex": 0,
+    "nodes": [
+      {
+        "type": "org.thingsboard.rule.engine.profile.TbDeviceProfileNode",
+        "name": "device profile",
+        "debugSettings": null,
+        "singletonMode": false,
+        "queueName": null,
+        "configurationVersion": 1,
+        "configuration": {
+          "persistAlarmRulesState": false,
+          "fetchAlarmRulesStateOnStart": false
+        },
+        "additionalInfo": {
+          "description": "",
+          "layoutX": 44,
+          "layoutY": 50
+        }
+      },
+      {
+        "type": "org.thingsboard.rule.engine.filter.TbMsgTypeSwitchNode",
+        "name": "swtich",
+        "debugSettings": null,
+        "singletonMode": false,
+        "queueName": null,
+        "configurationVersion": 0,
+        "configuration": {
+          "version": 0
+        },
+        "additionalInfo": {
+          "description": "",
+          "layoutX": 294,
+          "layoutY": 150
+        }
+      },
+      {
+        "type": "org.thingsboard.rule.engine.telemetry.TbMsgTimeseriesNode",
+        "name": "Cassandra",
+        "debugSettings": {
+          "failuresEnabled": true,
+          "allEnabled": false,
+          "allEnabledUntil": 1754294374159
+        },
+        "singletonMode": false,
+        "queueName": null,
+        "configurationVersion": 1,
+        "configuration": {
+          "processingSettings": {
+            "type": "ON_EVERY_MESSAGE"
+          },
+          "defaultTTL": 2592000,
+          "useServerTs": false
+        },
+        "additionalInfo": {
+          "description": "",
+          "layoutX": 314,
+          "layoutY": 250
+        }
+      },
+      {
+        "type": "org.thingsboard.rule.engine.telemetry.TbMsgAttributesNode",
+        "name": "PostgreSQL",
+        "debugSettings": null,
+        "singletonMode": false,
+        "queueName": null,
+        "configurationVersion": 3,
+        "configuration": {
+          "processingSettings": {
+            "type": "ON_EVERY_MESSAGE"
+          },
+          "scope": "SERVER_SCOPE",
+          "notifyDevice": false,
+          "sendAttributesUpdatedNotification": false,
+          "updateAttributesOnlyOnValueChange": true
+        },
+        "additionalInfo": {
+          "description": "",
+          "layoutX": 668,
+          "layoutY": 150
+        }
+      },
+      {
+        "type": "org.thingsboard.rule.engine.metadata.TbGetCustomerAttributeNode",
+        "name": "chainages",
+        "debugSettings": null,
+        "singletonMode": false,
+        "queueName": null,
+        "configurationVersion": 1,
+        "configuration": {
+          "dataToFetch": "ATTRIBUTES",
+          "dataMapping": {
+            "chainages": "chainages"
+          },
+          "fetchTo": "METADATA"
+        },
+        "additionalInfo": {
+          "description": "",
+          "layoutX": 263,
+          "layoutY": 50
+        }
+      },
+      {
+        "type": "org.thingsboard.rule.engine.transform.TbTransformMsgNode",
+        "name": "chainages",
+        "debugSettings": {
+          "failuresEnabled": false,
+          "allEnabled": false,
+          "allEnabledUntil": 1754235156312
+        },
+        "singletonMode": false,
+        "queueName": null,
+        "configurationVersion": 0,
+        "configuration": {
+          "scriptLang": "TBEL",
+          "jsScript": "return {msg: msg, metadata: metadata, msgType: msgType};",
+          "tbelScript": "var points = JSON.parse(metadata.chainages);\n\nreturn {msg: {\n    chainages: points\n}, metadata: {}, msgType: 'POST_ATTRIBUTES_REQUEST'};\n\n\n// Precompute splines from reference points\nfunction buildSplines(points) {\n    var n = points.size();\n    chainagePoints = points;\n    minChainage = points[0][0];\n    maxChainage = points[n-1][0];\n    \n    if (n <= 1) return;\n \n    // Extract chainages and coordinates\n    var s = [];\n    var x = [];\n    var y = [];\n    foreach (point : points) {\n        s.push(point[0]);\n        x.push(point[1]);\n        y.push(point[2]);\n    }\n    \n    splineX = calculateCubicSpline(s, x);\n    splineY = calculateCubicSpline(s, y);\n}\n \n// Calculate cubic spline coefficients for one dimension\nfunction calculateCubicSpline(s, vals) {\n    var n = s.size();\n    if (n <= 1) return [];\n    \n    // Initialize arrays\n    var a = [];\n    var b = [];\n    var c = [];\n    var d = [];\n    var h = [];\n    var alpha = [];\n    \n    // Calculate differences\n    for (var i = 0; i < n-1; i++) {\n        h.push(s[i+1] - s[i]);\n    }\n    \n    // Natural spline conditions (second derivatives = 0 at ends)\n    c[0] = c[n-1] = 0.0;\n    \n    // Calculate alpha\n    for (var i = 1; i < n-1; i++) {\n        alpha[i] = 3/h[i]*(vals[i+1]-vals[i]) - 3/h[i-1]*(vals[i]-vals[i-1]);\n    }\n    \n    // Solve tridiagonal system: Thomas algorithm\n    var l = [];\n    var mu = [];\n    var z = [];\n    l[0] = 1; mu[0] = z[0] = 0;\n    \n    for (var i = 1; i < n-1; i++) {\n        l[i] = 2*(s[i+1]-s[i-1]) - h[i-1]*mu[i-1];\n        mu[i] = h[i]/l[i];\n        z[i] = (alpha[i]-h[i-1]*z[i-1])/l[i];\n    }\n    \n    l[n-1] = 1;\n    z[n-1] = 0;\n    c = []; // Clear then recalc\n    c[n-1] = 0;\n    \n    // Back substitution\n    for (var j = n-2; j >= 0; j--) {\n        c[j] = z[j] - mu[j]*c[j+1];\n        b[j] = (vals[j+1]-vals[j])/h[j] - h[j]*(c[j+1]+2*c[j])/3;\n        d[j] = (c[j+1]-c[j])/(3*h[j]);\n        a[j] = vals[j];\n    }\n    \n    // Return coefficients [a, b, c, d] for each segment\n    var coeffs = [];\n    for (var i = 0; i < n-1; i++) {\n        coeffs.push([a[i], b[i], c[i], d[i]]);\n    }\n    return coeffs;\n}\n \n// Evaluate polynomial\nfunction evaluatePolynomial(s, s0, coeffs) {\n    var ds = s - s0;\n    return coeffs[0] + \n           coeffs[1]*ds + \n           coeffs[2]*(ds*ds) + \n           coeffs[3]*(ds*ds*ds);\n}\n \n// Find spline segment index for given chainage\nfunction findSegmentIndex(s) {\n    // Binary search for efficient segment lookup\n    var low = 0;\n    var high = chainagePoints.size() - 1;\n    \n    while (low <= high) {\n        if (s < minChainage) return 0;\n        if (s > maxChainage) return chainagePoints.size()-2;\n        \n        var mid = Math.floor((low + high) / 2);\n        if (s >= chainagePoints[mid][0] && \n            (mid == chainagePoints.size()-1 || \n             s < chainagePoints[mid+1][0])) {\n            return Math.max(0, Math.min(mid, chainagePoints.size()-2));\n        }\n        else if (s < chainagePoints[mid][0]) {\n            high = mid - 1;\n        }\n        else {\n            low = mid + 1;\n        }\n    }\n    return 0;\n}\n \n// Find chainage for new (lon, lat)\nfunction findChainageSpline(lon, lat) {\n    if (splineX.size() == 0 || splineY.size() == 0) {\n        // Splines not initialized\n        return null;\n    }\n    \n    // Step 1: Find closest reference point (chainage anchor)\n    var bestIndex = 0;\n    var bestDist = Double.MAX_VALUE;\n    \n    for (var i = 0; i < chainagePoints.size(); i++) {\n        var refLon = chainagePoints[i][1];\n        var refLat = chainagePoints[i][2];\n        var dist = Math.sqrt(\n            Math.pow(lon - refLon, 2) + \n            Math.pow(lat - refLat, 2)\n        );\n        \n        if (dist < bestDist) {\n            bestDist = dist;\n            bestIndex = i;\n        }\n    }\n    \n    // Step 2: Search neighboring segments (3 segments total)\n    var candidateSegments = [\n        Math.max(0, bestIndex - 1),\n        bestIndex,\n        Math.min(splineX.size()-1, bestIndex + 1)\n    ];\n    \n    // Step 3: Fine search in candidate segments\n    var overallBestS = minChainage;\n    var overallBestDist = Double.MAX_VALUE;\n    \n    foreach (segIdx : candidateSegments) {\n        var sSegStart = chainagePoints[segIdx][0];\n        var sSegEnd = chainagePoints[segIdx+1][0];\n        var steps = 10; // Samples per segment\n        \n        for (var i = 0; i <= steps; i++) {\n            var s = sSegStart + (sSegEnd - sSegStart) * i/steps;\n            var interpLon = getSplineLon(s);\n            var interpLat = getSplineLat(s);\n            \n            var dist = Math.sqrt(\n                Math.pow(lon - interpLon, 2) + \n                Math.pow(lat - interpLat, 2)\n            );\n            \n            if (dist < overallBestDist) {\n                overallBestDist = dist;\n                overallBestS = s;\n            }\n        }\n    }\n    \n    return overallBestS;\n}\n \n// Get interpolated longitude\nfunction getSplineLon(s) {\n    var segIdx = findSegmentIndex(s);\n    var s0 = chainagePoints[segIdx][0];\n    return evaluatePolynomial(s, s0, splineX[segIdx]);\n}\n \n// Get interpolated latitude\nfunction getSplineLat(s) {\n    var segIdx = findSegmentIndex(s);\n    var s0 = chainagePoints[segIdx][0];\n    return evaluatePolynomial(s, s0, splineY[segIdx]);\n}"
+        },
+        "additionalInfo": {
+          "description": "",
+          "layoutX": 563,
+          "layoutY": 50
+        }
+      },
+      {
+        "type": "org.thingsboard.rule.engine.edge.TbMsgPushToCloudNode",
+        "name": "221.231.235.19:7070",
+        "debugSettings": {
+          "failuresEnabled": false,
+          "allEnabled": false,
+          "allEnabledUntil": 1753341123349
+        },
+        "singletonMode": false,
+        "queueName": null,
+        "configurationVersion": 0,
+        "configuration": {
+          "scope": "SERVER_SCOPE"
+        },
+        "additionalInfo": {
+          "description": "",
+          "layoutX": 947,
+          "layoutY": 150
+        }
+      },
+      {
+        "type": "org.thingsboard.rule.engine.transform.TbTransformMsgNode",
+        "name": "geoStatus",
+        "debugSettings": {
+          "failuresEnabled": false,
+          "allEnabled": false,
+          "allEnabledUntil": 1754235164752
+        },
+        "singletonMode": false,
+        "queueName": null,
+        "configurationVersion": 0,
+        "configuration": {
+          "scriptLang": "TBEL",
+          "jsScript": "return {msg: msg, metadata: metadata, msgType: msgType};",
+          "tbelScript": "var statusMsg = {};\n\nif (null != msg.?longitude84 && null != msg.?latitude84 && 0.0 != msg.?longitude84 && 0.0 != msg.?latitude84) {\n    statusMsg.put(\"geoStatus\", 'connected and normal');\n}\nelse if (null != msg.?longitude84 && null != msg.?latitude84 && 0.0 == msg.?longitude84 && 0.0 == msg.?latitude84) {\n    statusMsg.put(\"geoStatus\", 'connected but abnormal');\n}\nelse {\n    statusMsg.put(\"geoStatus\", 'disconnected');\n}\n\nreturn {msg: statusMsg, metadata: metadata, msgType: 'POST_ATTRIBUTES_REQUEST'};"
+        },
+        "additionalInfo": {
+          "description": "",
+          "layoutX": 817,
+          "layoutY": 250
+        }
+      },
+      {
+        "type": "org.thingsboard.rule.engine.metadata.TbGetAttributesNode",
+        "name": "chainages",
+        "debugSettings": {
+          "failuresEnabled": true,
+          "allEnabled": false,
+          "allEnabledUntil": 1754294374159
+        },
+        "singletonMode": false,
+        "queueName": null,
+        "configurationVersion": 1,
+        "configuration": {
+          "tellFailureIfAbsent": true,
+          "fetchTo": "METADATA",
+          "clientAttributeNames": [],
+          "sharedAttributeNames": [],
+          "serverAttributeNames": [
+            "chainages"
+          ],
+          "latestTsKeyNames": [],
+          "getLatestValueWithTs": false
+        },
+        "additionalInfo": {
+          "description": "",
+          "layoutX": 47,
+          "layoutY": 250
+        }
+      },
+      {
+        "type": "org.thingsboard.rule.engine.transform.TbTransformMsgNode",
+        "name": "locate chainage",
+        "debugSettings": {
+          "failuresEnabled": true,
+          "allEnabled": false,
+          "allEnabledUntil": 1754294374159
+        },
+        "singletonMode": false,
+        "queueName": null,
+        "configurationVersion": 0,
+        "configuration": {
+          "scriptLang": "TBEL",
+          "jsScript": "return {msg: msg, metadata: metadata, msgType: msgType};",
+          "tbelScript": "// Main Script Body\nif (null != msg.?longitude84 && null != msg.?latitude84 && 0.0 != msg.?longitude84 && 0.0 != msg.?latitude84 && null != metadata.?ss_chainages) {\n    var chainages = decodeToJson(metadata.ss_chainages);\n    var currentPoint = [msg.longitude84, msg.latitude84];\n    var chainage = linearReference(currentPoint, chainages);\n    msg.put(\"chainage\", chainage);\n    \n} else {\n    // do nothing if inputs are invalid\n}\n\nreturn {\n    msg: msg,\n    metadata: {\n        deviceType: metadata.deviceType,\n        deviceName: metadata.deviceName,\n        ts: metadata.ts\n    },\n    msgType: msgType\n};\n\n// --- Helper Functions ---\n\nfunction linearReference(currentPoint, chainages) {\n    if (chainages == null || chainages.size() < 2) {\n        // Not enough points to form a line\n        return -1.0;\n    }\n\n    var minPerpDist = -1.0;\n    var finalProjectedMilestone = -1.0;\n\n    // Iterate through each line segment of the chainage path\n    for (var i = 0; i < chainages.size() - 1; i++) {\n        var segmentStart = chainages[i];       // e.g., [0, [112.8, 28.2]]\n        var segmentEnd = chainages[i+1];       // e.g., [10, [112.9, 28.3]]\n\n        var startMilestone = segmentStart[0];\n        var startPoint = segmentStart[1];\n        var endMilestone = segmentEnd[0];\n        var endPoint = segmentEnd[1];\n        \n        // Calculate the three sides of the triangle formed by the currentPoint and the segment endpoints\n        var distToStart = haversineDistance(currentPoint, startPoint);\n        var distToEnd = haversineDistance(currentPoint, endPoint);\n        var segmentLength = haversineDistance(startPoint, endPoint);\n\n        var perpDist;\n        var projectedMilestone;\n\n        // Process only if the segment has a valid length\n        if (segmentLength > 0) {\n            // Case 1: The closest point on the line is the segment's start point\n            if (distToEnd * distToEnd >= distToStart * distToStart + segmentLength * segmentLength) {\n                perpDist = distToStart;\n                projectedMilestone = startMilestone;\n            } \n            // Case 2: The closest point on the line is the segment's end point\n            else if (distToStart * distToStart >= distToEnd * distToEnd + segmentLength * segmentLength) {\n                perpDist = distToEnd;\n                projectedMilestone = endMilestone;\n            } \n            // Case 3: The closest point (projection) lies on the segment itself\n            else {\n                // Calculate the perpendicular distance from the point to the segment using Heron's formula for area\n                var s = (distToStart + distToEnd + segmentLength) / 2.0;\n                var area = Math.sqrt(s * (s - distToStart) * (s - distToEnd) * (s - segmentLength));\n                perpDist = 2.0 * area / segmentLength;\n\n                // Calculate the distance from the start of the segment to the projected point\n                // Using the Law of Cosines: projectedDist = (a^2 + c^2 - b^2) / 2c\n                var distAlongSegment = (distToStart * distToStart + segmentLength * segmentLength - distToEnd * distToEnd) / (2.0 * segmentLength);\n                projectedMilestone = startMilestone + distAlongSegment;\n            }\n\n            // If this segment is the closest one we've found so far, store its result\n            if (minPerpDist < 0 || perpDist < minPerpDist) {\n                minPerpDist = perpDist;\n                finalProjectedMilestone = projectedMilestone;\n            }\n        }\n    }\n    return finalProjectedMilestone;\n}\n\n\n// Calculates the Haversine distance between two points in meters.\nfunction haversineDistance(pointA, pointB) {\n    var lon1 = pointA[0];\n    var lat1 = pointA[1];\n    var lon2 = pointB[0];\n    var lat2 = pointB[1];\n\n    var degToRad = Math.PI / 180.0;\n    var latRad1 = lat1 * degToRad;\n    var lonRad1 = lon1 * degToRad;\n    var latRad2 = lat2 * degToRad;\n    var lonRad2 = lon2 * degToRad;\n\n    var dLat = latRad2 - latRad1;\n    var dLon = lonRad2 - lonRad1;\n\n    var a = Math.sin(dLat / 2) * Math.sin(dLat / 2) + Math.cos(latRad1) * Math.cos(latRad2) * Math.sin(dLon / 2) * Math.sin(dLon / 2);\n    var c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));\n    \n    // Earth's radius in meters\n    var R = 6371000; \n\n    return R * c;\n}\n\nfunction map(list, f) {\n    var newList = [];\n    foreach (element : list) {\n        newList.push(f(element));\n    }\n    return newList;\n}\n\nfunction transpose(matrix) {\n    if (matrix.size() == 0) {\n        return [];\n    }\n    var transposed = [];\n    var colCount = matrix[0].size();\n    for (var colIndex = 0; colIndex < colCount; colIndex++) {\n        var newRow = [];\n        foreach (row : matrix) {\n            newRow.push(row[colIndex]);\n        }\n        transposed.push(newRow);\n    }\n    return transposed;\n}\n\nfunction diff(list, f) {\n    if (list.size == 0 || list.size == 1) {\n        return [];\n    } else {\n        var output = [];\n        for (var i = 0; i < list.size() - 1; i++) {\n            output.push(f(list[i + 1], list[i]));\n        }\n        return output;\n    }\n}"
+        },
+        "additionalInfo": {
+          "description": "",
+          "layoutX": 311,
+          "layoutY": 349
+        }
+      },
+      {
+        "type": "org.thingsboard.rule.engine.filter.TbCheckMessageNode",
+        "name": "longitude84, latitude84, ss_chainages",
+        "debugSettings": {
+          "failuresEnabled": true,
+          "allEnabled": false,
+          "allEnabledUntil": 1754294355758
+        },
+        "singletonMode": false,
+        "queueName": null,
+        "configurationVersion": 0,
+        "configuration": {
+          "messageNames": [
+            "longitude84",
+            "latitude84"
+          ],
+          "metadataNames": [
+            "ss_chainages"
+          ],
+          "checkAllKeys": true
+        },
+        "additionalInfo": {
+          "description": "",
+          "layoutX": 60,
+          "layoutY": 350
+        }
+      },
+      {
+        "type": "org.thingsboard.rule.engine.action.TbDeviceStateNode",
+        "name": "disconnect -> inactivity",
+        "debugSettings": {
+          "failuresEnabled": true,
+          "allEnabled": false,
+          "allEnabledUntil": 1788523623700
+        },
+        "singletonMode": false,
+        "queueName": null,
+        "configurationVersion": 0,
+        "configuration": {
+          "event": "INACTIVITY_EVENT"
+        },
+        "additionalInfo": {
+          "description": "",
+          "layoutX": 585,
+          "layoutY": 250
+        }
+      },
+      {
+        "type": "org.thingsboard.rule.engine.filter.TbJsFilterNode",
+        "name": "Is activity older than disconnect",
+        "debugSettings": {
+          "failuresEnabled": true,
+          "allEnabled": false,
+          "allEnabledUntil": 1788523693484
+        },
+        "singletonMode": false,
+        "queueName": null,
+        "configurationVersion": 0,
+        "configuration": {
+          "scriptLang": "TBEL",
+          "jsScript": "return msg.temperature > 20;",
+          "tbelScript": "return msg.lastActivityTime < msg.lastDisconnectTime; "
+        },
+        "additionalInfo": {
+          "description": "",
+          "layoutX": 597,
+          "layoutY": 351
+        }
+      },
+      {
+        "type": "org.thingsboard.rule.engine.action.TbDeviceStateNode",
+        "name": "activity -> inactivity",
+        "debugSettings": {
+          "failuresEnabled": true,
+          "allEnabled": false,
+          "allEnabledUntil": 1788523693484
+        },
+        "singletonMode": false,
+        "queueName": null,
+        "configurationVersion": 0,
+        "configuration": {
+          "event": "INACTIVITY_EVENT"
+        },
+        "additionalInfo": {
+          "description": "",
+          "layoutX": 849,
+          "layoutY": 350
+        }
+      }
+    ],
+    "connections": [
+      {
+        "fromIndex": 0,
+        "toIndex": 1,
+        "type": "Failure"
+      },
+      {
+        "fromIndex": 0,
+        "toIndex": 1,
+        "type": "Success"
+      },
+      {
+        "fromIndex": 1,
+        "toIndex": 3,
+        "type": "Post attributes"
+      },
+      {
+        "fromIndex": 1,
+        "toIndex": 4,
+        "type": "Entity Assigned"
+      },
+      {
+        "fromIndex": 1,
+        "toIndex": 7,
+        "type": "Post telemetry"
+      },
+      {
+        "fromIndex": 1,
+        "toIndex": 8,
+        "type": "Post telemetry"
+      },
+      {
+        "fromIndex": 1,
+        "toIndex": 11,
+        "type": "Disconnect Event"
+      },
+      {
+        "fromIndex": 1,
+        "toIndex": 12,
+        "type": "Activity Event"
+      },
+      {
+        "fromIndex": 3,
+        "toIndex": 6,
+        "type": "Success"
+      },
+      {
+        "fromIndex": 4,
+        "toIndex": 5,
+        "type": "Success"
+      },
+      {
+        "fromIndex": 5,
+        "toIndex": 3,
+        "type": "Success"
+      },
+      {
+        "fromIndex": 7,
+        "toIndex": 3,
+        "type": "Success"
+      },
+      {
+        "fromIndex": 8,
+        "toIndex": 2,
+        "type": "Failure"
+      },
+      {
+        "fromIndex": 8,
+        "toIndex": 10,
+        "type": "Success"
+      },
+      {
+        "fromIndex": 9,
+        "toIndex": 2,
+        "type": "Failure"
+      },
+      {
+        "fromIndex": 9,
+        "toIndex": 2,
+        "type": "Success"
+      },
+      {
+        "fromIndex": 10,
+        "toIndex": 2,
+        "type": "False"
+      },
+      {
+        "fromIndex": 10,
+        "toIndex": 9,
+        "type": "True"
+      },
+      {
+        "fromIndex": 12,
+        "toIndex": 13,
+        "type": "True"
+      }
+    ],
+    "ruleChainConnections": null
+  }
+}

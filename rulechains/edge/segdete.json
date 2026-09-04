@@ -1,0 +1,649 @@
+{
+  "ruleChain": {
+    "name": "Segdete",
+    "type": "CORE",
+    "firstRuleNodeId": null,
+    "root": false,
+    "debugMode": true,
+    "configuration": null,
+    "additionalInfo": {
+      "description": ""
+    }
+  },
+  "metadata": {
+    "version": null,
+    "firstNodeIndex": 0,
+    "nodes": [
+      {
+        "type": "org.thingsboard.rule.engine.filter.TbMsgTypeSwitchNode",
+        "name": "switch",
+        "debugSettings": {
+          "failuresEnabled": false,
+          "allEnabled": false,
+          "allEnabledUntil": 1754247191112
+        },
+        "singletonMode": false,
+        "queueName": null,
+        "configurationVersion": 0,
+        "configuration": {
+          "version": 0
+        },
+        "additionalInfo": {
+          "description": "",
+          "layoutX": 339,
+          "layoutY": 150
+        }
+      },
+      {
+        "type": "org.thingsboard.rule.engine.filter.TbCheckMessageNode",
+        "name": "classResult",
+        "debugSettings": null,
+        "singletonMode": false,
+        "queueName": null,
+        "configurationVersion": 0,
+        "configuration": {
+          "messageNames": [
+            "classResult"
+          ],
+          "metadataNames": [],
+          "checkAllKeys": true
+        },
+        "additionalInfo": {
+          "description": "",
+          "layoutX": 40,
+          "layoutY": 50
+        }
+      },
+      {
+        "type": "org.thingsboard.rule.engine.transform.TbTransformMsgNode",
+        "name": "buzzer",
+        "debugSettings": null,
+        "singletonMode": false,
+        "queueName": null,
+        "configurationVersion": 0,
+        "configuration": {
+          "scriptLang": "TBEL",
+          "jsScript": "return {msg: msg, metadata: metadata, msgType: msgType};",
+          "tbelScript": "if (msg.classResult == 0 || msg.classResult == '0') {\n    return {\n        msg: {\n            command: 70\n        }, \n        metadata: metadata, \n        msgType: 'POST_ATTRIBUTES_REQUEST'\n    }; \n}\nelse {\n    return {\n        msg: {\n            command: 71\n        }, \n        metadata: metadata, \n        msgType: 'POST_ATTRIBUTES_REQUEST'\n    }; \n}\n\n\n"
+        },
+        "additionalInfo": {
+          "description": "",
+          "layoutX": 276,
+          "layoutY": 50
+        }
+      },
+      {
+        "type": "org.thingsboard.rule.engine.transform.TbChangeOriginatorNode",
+        "name": "Buzzer",
+        "debugSettings": {
+          "failuresEnabled": false,
+          "allEnabled": false,
+          "allEnabledUntil": 1754251757254
+        },
+        "singletonMode": false,
+        "queueName": null,
+        "configurationVersion": 0,
+        "configuration": {
+          "originatorSource": "RELATED",
+          "entityType": null,
+          "entityNamePattern": null,
+          "relationsQuery": {
+            "fetchLastLevelOnly": false,
+            "direction": "TO",
+            "maxLevel": 1,
+            "filters": [
+              {
+                "relationType": "Buzzes",
+                "entityTypes": [
+                  "DEVICE"
+                ]
+              }
+            ]
+          }
+        },
+        "additionalInfo": {
+          "description": "",
+          "layoutX": 537,
+          "layoutY": 50
+        }
+      },
+      {
+        "type": "org.thingsboard.rule.engine.flow.TbRuleChainInputNode",
+        "name": "BuzzerTricolor",
+        "debugSettings": {
+          "failuresEnabled": false,
+          "allEnabled": false,
+          "allEnabledUntil": 1754251764621
+        },
+        "singletonMode": false,
+        "queueName": null,
+        "configurationVersion": 1,
+        "configuration": {
+          "forwardMsgToDefaultRuleChain": false,
+          "ruleChainId": "00fa99f0-6622-11f0-aaa7-19f55fd6bf05"
+        },
+        "additionalInfo": {
+          "description": "",
+          "layoutX": 799,
+          "layoutY": 50
+        }
+      },
+      {
+        "type": "org.thingsboard.rule.engine.transform.TbTransformMsgNode",
+        "name": "cameraStatus",
+        "debugSettings": {
+          "failuresEnabled": false,
+          "allEnabled": false,
+          "allEnabledUntil": 1754234536052
+        },
+        "singletonMode": false,
+        "queueName": null,
+        "configurationVersion": 0,
+        "configuration": {
+          "scriptLang": "TBEL",
+          "jsScript": "var statusMsg = {};\n\nif (null != msg.cameraStatus) {\n    statusMsg.put(\"cameraStatus\", msg.cameraStatus);\n}\nelse {\n     statusMsg.put(\"cameraStatus\", \"disconnected\");\n}\n\n\nreturn {msg: msg, metadata: metadata, msgType: 'POST_ATTRIBUTES_REQUEST'};",
+          "tbelScript": "var statusMsg = {};\n\nif (null != msg.cameraStatus) {\n    statusMsg.put(\"cameraStatus\", msg.cameraStatus);\n}\nelse {\n     statusMsg.put(\"cameraStatus\", \"disconnected\");\n}\n\n\nreturn {msg: statusMsg, metadata: metadata, msgType: 'POST_ATTRIBUTES_REQUEST'};"
+        },
+        "additionalInfo": {
+          "description": "",
+          "layoutX": 640,
+          "layoutY": 150
+        }
+      },
+      {
+        "type": "org.thingsboard.rule.engine.telemetry.TbMsgAttributesNode",
+        "name": "PostgreSQL",
+        "debugSettings": {
+          "failuresEnabled": false,
+          "allEnabled": false,
+          "allEnabledUntil": 1754247210586
+        },
+        "singletonMode": false,
+        "queueName": null,
+        "configurationVersion": 3,
+        "configuration": {
+          "processingSettings": {
+            "type": "ON_EVERY_MESSAGE"
+          },
+          "scope": "SERVER_SCOPE",
+          "notifyDevice": false,
+          "sendAttributesUpdatedNotification": false,
+          "updateAttributesOnlyOnValueChange": true
+        },
+        "additionalInfo": {
+          "description": "",
+          "layoutX": 1016,
+          "layoutY": 50
+        }
+      },
+      {
+        "type": "org.thingsboard.rule.engine.metadata.TbGetCustomerAttributeNode",
+        "name": "car",
+        "debugSettings": null,
+        "singletonMode": false,
+        "queueName": null,
+        "configurationVersion": 1,
+        "configuration": {
+          "dataToFetch": "ATTRIBUTES",
+          "dataMapping": {
+            "car": "car"
+          },
+          "fetchTo": "METADATA"
+        },
+        "additionalInfo": {
+          "description": "",
+          "layoutX": 658,
+          "layoutY": 250
+        }
+      },
+      {
+        "type": "org.thingsboard.rule.engine.transform.TbTransformMsgNode",
+        "name": "car",
+        "debugSettings": null,
+        "singletonMode": false,
+        "queueName": null,
+        "configurationVersion": 0,
+        "configuration": {
+          "scriptLang": "TBEL",
+          "jsScript": "var carMsg = {};\n\nif (null != metadata.car) {\n    carMsg.put('car', metadata.car);\n}\n\nreturn {msg: carMsg, metadata: metadata, msgType: 'POST_ATTRIBUTES_REQUEST'};",
+          "tbelScript": "var carMsg = {};\n\nif (null != metadata.car) {\n    carMsg.put('car', metadata.car);\n}\n\nreturn {msg: carMsg, metadata: metadata, msgType: 'POST_ATTRIBUTES_REQUEST'};"
+        },
+        "additionalInfo": {
+          "description": "",
+          "layoutX": 913,
+          "layoutY": 250
+        }
+      },
+      {
+        "type": "org.thingsboard.rule.engine.transform.TbTransformMsgNode",
+        "name": "result",
+        "debugSettings": {
+          "failuresEnabled": true,
+          "allEnabled": false,
+          "allEnabledUntil": 1756198467332
+        },
+        "singletonMode": false,
+        "queueName": null,
+        "configurationVersion": 0,
+        "configuration": {
+          "scriptLang": "TBEL",
+          "jsScript": "return {msg: msg, metadata: metadata, msgType: 'POST_ATTRIBUTES_REQUEST'};",
+          "tbelScript": "if (null != msg.classResult && ('1' == msg.classResult || 1 == msg.classResult)) {\n    msg.put(\"result\", \"MAJOR\");\n    return {msg: msg, metadata: metadata, msgType: 'POST_ATTRIBUTES_REQUEST'};\n}\nelse if (null != msg.classResult && ('0' == msg.classResult || 0 == msg.classResult)) {\n    msg.put(\"result\", \"INDETERMINATE\");\n    return {msg: msg, metadata: metadata, msgType: 'POST_ATTRIBUTES_REQUEST'};\n}\nelse {\n    return {msg: msg, metadata: metadata, msgType: 'POST_ATTRIBUTES_REQUEST'};\n}\n"
+        },
+        "additionalInfo": {
+          "description": "",
+          "layoutX": 52,
+          "layoutY": 250
+        }
+      },
+      {
+        "type": "org.thingsboard.rule.engine.telemetry.TbMsgTimeseriesNode",
+        "name": "Cassandra",
+        "debugSettings": {
+          "failuresEnabled": false,
+          "allEnabled": false,
+          "allEnabledUntil": 1754243430131
+        },
+        "singletonMode": false,
+        "queueName": null,
+        "configurationVersion": 1,
+        "configuration": {
+          "processingSettings": {
+            "type": "ON_EVERY_MESSAGE"
+          },
+          "defaultTTL": 1814400,
+          "useServerTs": false
+        },
+        "additionalInfo": {
+          "description": "",
+          "layoutX": 620,
+          "layoutY": 450
+        }
+      },
+      {
+        "type": "org.thingsboard.rule.engine.metadata.TbGetRelatedAttributeNode",
+        "name": "geoposition data",
+        "debugSettings": {
+          "failuresEnabled": false,
+          "allEnabled": false,
+          "allEnabledUntil": 1756198453539
+        },
+        "singletonMode": false,
+        "queueName": null,
+        "configurationVersion": 1,
+        "configuration": {
+          "relationsQuery": {
+            "fetchLastLevelOnly": false,
+            "direction": "FROM",
+            "maxLevel": 1,
+            "filters": [
+              {
+                "relationType": "Locates",
+                "entityTypes": [
+                  "DEVICE"
+                ]
+              }
+            ]
+          },
+          "dataToFetch": "LATEST_TELEMETRY",
+          "fetchTo": "DATA",
+          "dataMapping": {
+            "longitude84": "longitude84",
+            "latitude84": "latitude84",
+            "chainage": "chainage"
+          }
+        },
+        "additionalInfo": {
+          "description": "",
+          "layoutX": 58,
+          "layoutY": 350
+        }
+      },
+      {
+        "type": "org.thingsboard.rule.engine.metadata.TbGetCustomerDetailsNode",
+        "name": "project details",
+        "debugSettings": {
+          "failuresEnabled": false,
+          "allEnabled": false,
+          "allEnabledUntil": 1756198444442
+        },
+        "singletonMode": false,
+        "queueName": null,
+        "configurationVersion": 1,
+        "configuration": {
+          "detailsList": [
+            "TITLE"
+          ],
+          "fetchTo": "METADATA"
+        },
+        "additionalInfo": {
+          "description": "",
+          "layoutX": 60,
+          "layoutY": 450
+        }
+      },
+      {
+        "type": "org.thingsboard.rule.engine.metadata.TbGetCustomerAttributeNode",
+        "name": "project attributes",
+        "debugSettings": {
+          "failuresEnabled": false,
+          "allEnabled": false,
+          "allEnabledUntil": 1756198453539
+        },
+        "singletonMode": false,
+        "queueName": null,
+        "configurationVersion": 1,
+        "configuration": {
+          "dataToFetch": "ATTRIBUTES",
+          "dataMapping": {
+            "builder": "builder",
+            "car": "car",
+            "constructor": "constructor"
+          },
+          "fetchTo": "DATA"
+        },
+        "additionalInfo": {
+          "description": "",
+          "layoutX": 97,
+          "layoutY": 550
+        }
+      },
+      {
+        "type": "org.thingsboard.rule.engine.action.TbCreateRelationNode",
+        "name": "Segdete -> Recognition",
+        "debugSettings": {
+          "failuresEnabled": false,
+          "allEnabled": false,
+          "allEnabledUntil": 1756198421830
+        },
+        "singletonMode": false,
+        "queueName": null,
+        "configurationVersion": 1,
+        "configuration": {
+          "direction": "FROM",
+          "entityType": "ASSET",
+          "entityNamePattern": "$[imageId]",
+          "entityTypePattern": "Recognition",
+          "relationType": "Capture",
+          "createEntityIfNotExists": true,
+          "removeCurrentRelations": false,
+          "changeOriginatorToRelatedEntity": true
+        },
+        "additionalInfo": {
+          "description": "",
+          "layoutX": 405,
+          "layoutY": 450
+        }
+      },
+      {
+        "type": "org.thingsboard.rule.engine.flow.TbRuleChainInputNode",
+        "name": "Recognition",
+        "debugSettings": {
+          "failuresEnabled": false,
+          "allEnabled": false,
+          "allEnabledUntil": 1756198438731
+        },
+        "singletonMode": false,
+        "queueName": null,
+        "configurationVersion": 1,
+        "configuration": {
+          "forwardMsgToDefaultRuleChain": false,
+          "ruleChainId": "964545c0-65df-11f0-9c33-b1f3dd5bd239"
+        },
+        "additionalInfo": {
+          "description": "",
+          "layoutX": 500,
+          "layoutY": 550
+        }
+      },
+      {
+        "type": "org.thingsboard.rule.engine.edge.TbMsgPushToCloudNode",
+        "name": "221.231.235.19:7070",
+        "debugSettings": null,
+        "singletonMode": false,
+        "queueName": null,
+        "configurationVersion": 0,
+        "configuration": {
+          "scope": "SERVER_SCOPE"
+        },
+        "additionalInfo": {
+          "description": "",
+          "layoutX": 1135,
+          "layoutY": 451
+        }
+      },
+      {
+        "type": "org.thingsboard.rule.engine.transform.TbTransformMsgNode",
+        "name": "result",
+        "debugSettings": {
+          "failuresEnabled": false,
+          "allEnabled": false,
+          "allEnabledUntil": 1754243521777
+        },
+        "singletonMode": false,
+        "queueName": null,
+        "configurationVersion": 0,
+        "configuration": {
+          "scriptLang": "TBEL",
+          "jsScript": "return {msg: msg, metadata: metadata, msgType: 'POST_ATTRIBUTES_REQUEST'};",
+          "tbelScript": "if (null != msg.result && ('1' == msg.result || 1 == msg.result)) {\n    return {msg: msg, metadata: metadata, msgType: msgType};\n}\nelse if (null != msg.result && ('0' == msg.result || 0 == msg.result)) {\n    return {msg: msg, metadata: metadata, msgType: msgType};\n}\nelse {\n    return {msg: msg, metadata: metadata, msgType: msgType};\n}\n"
+        },
+        "additionalInfo": {
+          "description": "",
+          "layoutX": 257,
+          "layoutY": 350
+        }
+      },
+      {
+        "type": "org.thingsboard.rule.engine.action.TbDeviceStateNode",
+        "name": "disconnect -> inactivity",
+        "debugSettings": {
+          "failuresEnabled": true,
+          "allEnabled": false,
+          "allEnabledUntil": 1788523779734
+        },
+        "singletonMode": false,
+        "queueName": null,
+        "configurationVersion": 0,
+        "configuration": {
+          "event": "INACTIVITY_EVENT"
+        },
+        "additionalInfo": {
+          "description": "",
+          "layoutX": 352,
+          "layoutY": 250
+        }
+      },
+      {
+        "type": "org.thingsboard.rule.engine.filter.TbJsFilterNode",
+        "name": "Is activity older than disconnect",
+        "debugSettings": {
+          "failuresEnabled": true,
+          "allEnabled": false,
+          "allEnabledUntil": 1788523838871
+        },
+        "singletonMode": false,
+        "queueName": null,
+        "configurationVersion": 0,
+        "configuration": {
+          "scriptLang": "TBEL",
+          "jsScript": "return msg.temperature > 20;",
+          "tbelScript": "return msg.lastActivityTime < msg.lastDisconnectTime; "
+        },
+        "additionalInfo": {
+          "description": "",
+          "layoutX": 528,
+          "layoutY": 350
+        }
+      },
+      {
+        "type": "org.thingsboard.rule.engine.action.TbDeviceStateNode",
+        "name": "activity -> inactivity",
+        "debugSettings": {
+          "failuresEnabled": true,
+          "allEnabled": false,
+          "allEnabledUntil": 1788523838871
+        },
+        "singletonMode": false,
+        "queueName": null,
+        "configurationVersion": 0,
+        "configuration": {
+          "event": "INACTIVITY_EVENT"
+        },
+        "additionalInfo": {
+          "description": "",
+          "layoutX": 814,
+          "layoutY": 351
+        }
+      }
+    ],
+    "connections": [
+      {
+        "fromIndex": 0,
+        "toIndex": 1,
+        "type": "Post telemetry"
+      },
+      {
+        "fromIndex": 0,
+        "toIndex": 5,
+        "type": "Post telemetry"
+      },
+      {
+        "fromIndex": 0,
+        "toIndex": 6,
+        "type": "Post attributes"
+      },
+      {
+        "fromIndex": 0,
+        "toIndex": 7,
+        "type": "Entity Assigned"
+      },
+      {
+        "fromIndex": 0,
+        "toIndex": 9,
+        "type": "Post telemetry"
+      },
+      {
+        "fromIndex": 0,
+        "toIndex": 17,
+        "type": "Post telemetry"
+      },
+      {
+        "fromIndex": 0,
+        "toIndex": 18,
+        "type": "Disconnect Event"
+      },
+      {
+        "fromIndex": 0,
+        "toIndex": 19,
+        "type": "Activity Event"
+      },
+      {
+        "fromIndex": 1,
+        "toIndex": 2,
+        "type": "True"
+      },
+      {
+        "fromIndex": 2,
+        "toIndex": 3,
+        "type": "Success"
+      },
+      {
+        "fromIndex": 3,
+        "toIndex": 4,
+        "type": "Success"
+      },
+      {
+        "fromIndex": 5,
+        "toIndex": 6,
+        "type": "Success"
+      },
+      {
+        "fromIndex": 6,
+        "toIndex": 16,
+        "type": "Failure"
+      },
+      {
+        "fromIndex": 6,
+        "toIndex": 16,
+        "type": "Success"
+      },
+      {
+        "fromIndex": 7,
+        "toIndex": 8,
+        "type": "Success"
+      },
+      {
+        "fromIndex": 8,
+        "toIndex": 6,
+        "type": "Success"
+      },
+      {
+        "fromIndex": 9,
+        "toIndex": 11,
+        "type": "Failure"
+      },
+      {
+        "fromIndex": 9,
+        "toIndex": 11,
+        "type": "Success"
+      },
+      {
+        "fromIndex": 10,
+        "toIndex": 16,
+        "type": "Failure"
+      },
+      {
+        "fromIndex": 10,
+        "toIndex": 16,
+        "type": "Success"
+      },
+      {
+        "fromIndex": 11,
+        "toIndex": 12,
+        "type": "Failure"
+      },
+      {
+        "fromIndex": 11,
+        "toIndex": 12,
+        "type": "Success"
+      },
+      {
+        "fromIndex": 12,
+        "toIndex": 13,
+        "type": "Success"
+      },
+      {
+        "fromIndex": 12,
+        "toIndex": 14,
+        "type": "Failure"
+      },
+      {
+        "fromIndex": 13,
+        "toIndex": 14,
+        "type": "Failure"
+      },
+      {
+        "fromIndex": 13,
+        "toIndex": 14,
+        "type": "Success"
+      },
+      {
+        "fromIndex": 14,
+        "toIndex": 15,
+        "type": "Success"
+      },
+      {
+        "fromIndex": 17,
+        "toIndex": 10,
+        "type": "Success"
+      },
+      {
+        "fromIndex": 19,
+        "toIndex": 20,
+        "type": "True"
+      }
+    ],
+    "ruleChainConnections": null
+  }
+}
