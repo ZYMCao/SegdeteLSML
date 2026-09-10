@@ -55,6 +55,8 @@ def test_capture_failure_keeps_camera_available(monkeypatch, capture):
     cameras = [Mock(), Mock()]
     for camera in cameras:
         camera.IsOpen.return_value = True
+        camera.IsPylonDeviceAttached.return_value = True
+        camera.IsCameraDeviceRemoved.return_value = False
     backend = Mock(cameras=cameras)
     backend.initialize.return_value = True
     if capture == "incomplete":
