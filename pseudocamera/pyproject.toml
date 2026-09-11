@@ -1,0 +1,30 @@
+[project]
+name = "pseudocamera"
+version = "0.1.0"
+description = "Standalone Basler camera masquerade for SegDete integration testing (no hardware)"
+requires-python = ">=3.13"
+dependencies = [
+    "numpy>=1.23.0",
+    "opencv-python-headless>=4.7.0.72",
+]
+
+[project.scripts]
+pseudocamera = "pseudocamera.cli:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+force-include = { "src/pseudocamera" = "pseudocamera" }
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0.0",
+]
+
+[tool.uv]
+cache-keys = [{ file = "pyproject.toml" }, { file = "src/**/*.py" }]

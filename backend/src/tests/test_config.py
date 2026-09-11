@@ -67,21 +67,6 @@ def test_messaging_config_ignores_legacy_tb_env(monkeypatch):
     assert cfg.access_token == ""
 
 
-def test_replay_camera_config_from_environment(monkeypatch):
-    monkeypatch.setenv("SEGDETE_CAMERA_BACKEND", "replay")
-    monkeypatch.setenv("SEGDETE_REPLAY_SOURCE", "/srv/field-images")
-
-    cfg = AcquisitionConfig()
-
-    assert cfg.camera_backend == "replay"
-    assert cfg.replay_source == "/srv/field-images"
-
-
-def test_replay_camera_rejects_invalid_backend():
-    with pytest.raises(ValidationError):
-        AcquisitionConfig(camera_backend="serial")
-
-
 @pytest.mark.parametrize("value", [-1, True, 2.0, "1.5", None])
 def test_runtime_rejects_invalid_interval(value):
     with pytest.raises(ValidationError):

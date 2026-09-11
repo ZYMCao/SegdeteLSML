@@ -45,18 +45,12 @@ def test_camera_initialization_failure_never_connects_mqtt(monkeypatch):
     client.disconnect.assert_called_once_with()
 
 
-def test_replay_backend_is_owned_by_running_cli(monkeypatch, tmp_path):
+def test_basler_backend_is_owned_by_running_cli(monkeypatch):
     monkeypatch.setenv("MQTT_TOKEN", "test-device")
     settings = load_settings()
-    settings.acquisition.camera_backend = "replay"
-    settings.runtime.prewarm_frames = 20
-    replay_camera = Mock(
-        sn_list=["replay-left", "replay-right"],
-        source_dir=tmp_path / "source",
-        image_count=2,
-        web_running=True,
-    )
-    replay_camera.is_available.return_value = True
+    settings.acquisition.camera_sns = ["SN-A", "SN-B"]
+    basler_camera = Mock(sn_list=["SN-A", "SN-B"], web_running=True)
+    basler_camera.is_available.return_value = True
     client = Mock(access_token="test-device")
     client.connect.return_value = True
 
@@ -75,21 +69,19 @@ def test_replay_backend_is_owned_by_running_cli(monkeypatch, tmp_path):
     monkeypatch.setattr(cli, "setup_logging", Mock())
     monkeypatch.setattr(cli, "_print_startup_diagnostics", Mock())
     monkeypatch.setattr(cli, "init_yolo_config", Mock())
-    physical_camera = Mock()
-    monkeypatch.setattr(cli, "ThreadSafeCameraManager", physical_camera)
-    replay_factory = Mock(return_value=replay_camera)
-    monkeypatch.setattr(cli, "ReplayCameraManager", replay_factory)
+    basler_factory = Mock(return_value=basler_camera)
+    monkeypatch.setattr(cli, "ThreadSafeCameraManager", basler_factory)
     monkeypatch.setattr(cli, "TBEdgeClient", Mock(return_value=client))
     monkeypatch.setattr(cli, "segdete_processing_loop", Mock())
     monkeypatch.setattr(cli.signal, "signal", Mock())
 
     cli.main()
 
-    physical_camera.assert_not_called()
-    replay_factory.assert_called_once_with(settings.acquisition.replay_source)
-    assert settings.runtime.prewarm_frames == 0
-    assert settings.vision.prealign.enabled is False
-    assert settings.vision.calib.enabled is False
-    assert settings.vision.stitch.input == "raw"
+    basler_factory.assert_called_once_with(
+        sn_list=["SN-A", "SN-B"],
+        exposure_time=settings.acquisition.exposure_time,
+        frame_rate=settings.acquisition.frame_rate,
+        camera_params=settings.acquisition.camera_params(),
+    )
     client.connect.assert_called_once_with()
     client.disconnect.assert_called_once_with()

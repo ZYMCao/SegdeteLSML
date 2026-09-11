@@ -6,7 +6,6 @@ from unittest.mock import Mock
 import cv2
 import numpy as np
 import pytest
-from segdete.camera.replay import ReplayCameraManager
 from segdete.config.settings import load_settings
 from segdete.pipeline import processor
 from segdete.vision.classifier import MLClassifier
@@ -76,20 +75,6 @@ def test_successful_cycle_saves_images_csv_and_telemetry(cycle_inputs):
     assert payload["imageId"] == Path(image_name).stem
     assert payload["classResult"] == 1
     assert payload["urlPre"] == cycle_inputs["settings"].storage.image_url(image_path)
-
-
-def test_replay_source_image_flows_to_business_telemetry(cycle_inputs, tmp_path):
-    source = tmp_path / "replay-source"
-    source.mkdir()
-    image_path = source / "field.png"
-    assert cv2.imwrite(str(image_path), np.full((24, 64, 3), 80, dtype=np.uint8))
-    cycle_inputs["camera_manager"] = ReplayCameraManager(source)
-
-    assert processor.process_one_cycle(**cycle_inputs) is True
-
-    cycle_inputs["tb_client"].send_telemetry.assert_called_once()
-    assert cycle_inputs["camera_manager"].current_source == "field.png"
-    assert image_path.is_file()
 
 
 def test_cycle_reports_failure_when_mqtt_rejects_telemetry(cycle_inputs):

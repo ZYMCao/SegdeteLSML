@@ -3,8 +3,6 @@
 
 from typing import ClassVar
 
-import cv2
-import numpy as np
 import pytest
 from pypylon import pylon
 
@@ -169,17 +167,8 @@ def test_cli_contract_no_leak_on_unavailable(fake_pylon):
         assert cam.destroy_calls >= 1
 
 
-def test_camera_is_available_delegates(tmp_path):
-    from segdete.camera.replay import ReplayCameraManager
+def test_camera_is_available_delegates():
     from segdete.pipeline.processor import _camera_is_available
-
-    d = tmp_path / "replay"
-    d.mkdir()
-    cv2.imwrite(str(d / "a.png"), np.zeros((10, 10, 3), np.uint8))
-    replay = ReplayCameraManager(str(d))
-    assert _camera_is_available(replay) is True
-    replay.close()
-    assert _camera_is_available(replay) is False
 
     class _StubWithoutHealth:
         sn_list: ClassVar = ["x"]

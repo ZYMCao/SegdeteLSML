@@ -9,5 +9,4 @@
 ## Git
 - Both `~/PyCharmProjects/Segdete/.lsml` and `~/PyCharmProjects/Segdete/.git` manages the project of mumbo and point to two distinct remote github repos respectively
 - `.lsml` manages `.agents`, `docs/lsml`, `lsml`, `.opencode/plugins`, CONTEXT.md, AGENTS.md; `.git` manages `backend`, `frontend`, `deploy`, `rulechains`, `docs/mqtt` and `docs/segdete`
-- `scripta/ops/git.ts` keeps `.lsml/info/exclude` and `.git/info/exclude` in sync with the scripta split
 - `git config --global alias.lsml` returns `!git --git-dir=~/PyCharmProjects/Segdete/.lsml --work-tree=~/PyCharmProjects/Segdete`
